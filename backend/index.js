@@ -4,11 +4,8 @@ import { configDotenv } from "dotenv";
 import userModel from "./models/UserModel.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Passport } from "passport";
-import {LocalStrategy} from "passport-local";
-import {crypto} from "crypto";
-
-const passport = new Passport();
+import passport from "passport";
+import { Strategy as LocalStrategy } from "passport-local";
 
 passport.use(new LocalStrategy(
   async (username, password, done) => {
@@ -40,8 +37,10 @@ app.use(express.urlencoded({ extended: true }));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
+app.use(passport.initialize());
 
-const db = mongoose
+
+mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch((e) => {
@@ -81,11 +80,24 @@ app.get("/login", (req, res) => {
   res.render("login");
 });
 
-app.post("/login", passport.authenticate('local', {
-  successRedirect: '/user',
-  failureRedirect: '/login',
-  failureFlash: true
-}));
+app.post("/login", (req, res, next) => {
+  passport.authenticate("local", { session: false }, (err, user, info) => {
+    if (err) {
+      console.log(`Error during login: ${err.message}`);
+      return res.status(500).render("login", {
+        error: "Something went wrong during login",
+      });
+    }
+
+    if (!user) {
+      return res.status(401).render("login", {
+        error: info?.message || "Invalid username or password",
+      });
+    }
+
+    return res.redirect("/user");
+  })(req, res, next);
+});
 
 app.get("/user", (req, res) => {
   res.render("afterUser");
