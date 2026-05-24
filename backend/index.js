@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import session from "express-session";
 
 passport.use(new LocalStrategy(
   async (username, password, done) => {
@@ -36,7 +37,13 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
-
+app.use(
+  session({
+    secret: "mysecretkey",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
 app.use(passport.initialize());
 
 
@@ -81,26 +88,36 @@ app.get("/login", (req, res) => {
 });
 
 app.post("/login", (req, res, next) => {
-  passport.authenticate("local", { session: false }, (err, user, info) => {
+  passport.authenticate("local", (err, user, info) => {
+
     if (err) {
-      console.log(`Error during login: ${err.message}`);
       return res.status(500).render("login", {
-        error: "Something went wrong during login",
+        error: "Something went wrong"
       });
     }
 
     if (!user) {
       return res.status(401).render("login", {
-        error: info?.message || "Invalid username or password",
+        error: info?.message || "Invalid credentials"
       });
     }
 
+    // save user in session
+    req.session.user = user;
+
     return res.redirect("/user");
+
   })(req, res, next);
 });
-
 app.get("/user", (req, res) => {
   res.render("afterUser");
+});
+app.get("/session", (req, res) => {
+  if(req.session.user) {
+    res.send(`Welcome, ${req.session.user.name}!`);
+  } else {
+    res.status(401).json({ error: "Not authenticated" });
+  }
 });
 
 app.get("/", (req, res) => {
