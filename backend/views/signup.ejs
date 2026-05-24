@@ -8,6 +8,10 @@
   <body>
     <h1>Sign Up</h1>
 
+    <% if (typeof error !== 'undefined' && error) { %>
+      <p style="color: red;"><%= error %></p>
+    <% } %>
+
     <form method="POST" action="/signup">
       <div>
         <label for="name">Name</label>

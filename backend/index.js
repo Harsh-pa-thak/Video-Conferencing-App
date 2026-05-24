@@ -4,7 +4,28 @@ import { configDotenv } from "dotenv";
 import userModel from "./models/UserModel.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Passport } from "passport";
+import {LocalStrategy} from "passport-local";
+import {crypto} from "crypto";
 
+const passport = new Passport();
+
+passport.use(new LocalStrategy(
+  async (username, password, done) => {
+    try {
+      const user = await userModel.findOne({ username });
+      if (!user) {
+        return done(null, false, { message: 'Incorrect username.' });
+      }
+      if (user.password !== password) {
+        return done(null, false, { message: 'Incorrect password.' });
+      }
+      return done(null, user);
+    } catch (err) {
+      return done(err);
+    }
+  }
+)); 
 
 configDotenv();
 
@@ -34,18 +55,40 @@ app.post("/signup", async (req, res) => {
   const { name, username, password } = req.body;
   try {
     if (!name || !username || !password) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).render("signup", {
+        error: "All fields are required",
+      });
     }
     const existingUser = await userModel.findOne({ username });
-    if (existingUser)
-      return res.status(400).json({ message: "Username already exists" });
+    if (existingUser) {
+      return res.status(400).render("signup", {
+        error: "Username already exists",
+      });
+    }
     const newUser = new userModel({ name, username, password });
     await newUser.save();
-    
-    res.status(201).json({ message: "User created successfully" }).redirect("/user");
+
+    return res.redirect("/user");
   } catch (e) {
     console.log(`Error creating user: ${e.message}`);
+    return res.status(500).render("signup", {
+      error: "Something went wrong while creating your account",
+    });
   }
+});
+
+app.get("/login", (req, res) => {
+  res.render("login");
+});
+
+app.post("/login", passport.authenticate('local', {
+  successRedirect: '/user',
+  failureRedirect: '/login',
+  failureFlash: true
+}));
+
+app.get("/user", (req, res) => {
+  res.render("afterUser");
 });
 
 app.get("/", (req, res) => {
